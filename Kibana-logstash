@@ -1,0 +1,220 @@
+步骤一：导入数据
+  使用POST方式批量导入数据，数据格式为json，url 编码使用data-binary导入含有index配置的json文件
+    [root@room9pc01 ~]# scp /var/ftp/elk/*.gz 192.168.1.66:/root/
+    [root@kibana ~]# gzip  -d logs.jsonl.gz 
+    [root@kibana ~]#  gzip  -d accounts.json.gz 
+    [root@kibana ~]# gzip  -d shakespeare.json.gz
+    [root@kibana ~]# curl -X POST "http://192.168.1.61:9200/_bulk" \       //_bulk 批量导入 批量导入可以合并多个操作
+    --data-binary @shakespeare.json
+    [root@kibana ~]# curl -X POST "http://192.168.1.61:9200/xixi/haha/_bulk" \
+     --data-binary @accounts.json  
+    //索引是xixi，类型是haha，必须导入索引和类型，没有索引，要加上
+    [root@kibana ~]# curl -X POST "http://192.168.1.61:9200/_bulk"  \ 
+    --data-binary @logs.jsonl
+
+  使用GET查询结果
+        [root@kibana ~]# curl -XGET 'http://192.168.1.61:9200/_mget?pretty' -d '{     //_mget批量查询
+     "docs":[
+         {
+            "_index":"shakespeare",
+            "_type:":"act",
+            "_id":0
+    },
+    {
+            "_index":"shakespeare",
+            "_type:":"line",
+            "_id":0
+    },
+    {
+            "_index":"xixi",
+            "_type:":"haha",
+            "_id":25
+    }
+    ]
+    }'
+    //查询的结果-------------------------------------------------------------
+    {        
+    "docs" : [ {
+        "_index" : "shakespeare",
+        "_type" : "act",
+        "_id" : "0",
+        "_version" : 1,
+        "found" : true,
+        "_source" : {
+          "line_id" : 1,
+          "play_name" : "Henry IV",
+          "speech_number" : "",
+          "line_number" : "",
+          "speaker" : "",
+          "text_entry" : "ACT I"
+        }
+      }, {
+        "_index" : "shakespeare",
+        "_type" : "act",
+        "_id" : "0",
+        "_version" : 1,
+        "found" : true,
+        "_source" : {
+          "line_id" : 1,
+          "play_name" : "Henry IV",
+          "speech_number" : "",
+          "line_number" : "",
+          "speaker" : "",
+          "text_entry" : "ACT I"
+        }
+      }, {
+        "_index" : "xixi",
+        "_type" : "haha",
+        "_id" : "25",
+        "_version" : 1,
+        "found" : true,
+        "_source" : {
+          "account_number" : 25,
+          "balance" : 40540,
+          "firstname" : "Virginia",
+          "lastname" : "Ayala",
+          "age" : 39,
+          "gender" : "F",
+          "address" : "171 Putnam Avenue",
+          "employer" : "Filodyne",
+          "email" : "virginiaayala@filodyne.com",
+          "city" : "Nicholson",
+          "state" : "PA"
+        }
+      } ]
+    }
+    
+map映射
+  映射:创建索引的时候,可预先定义字段类型和属性
+  作用:让索引更加细致完善
+  分类:静态映射和动态映射
+  动态:自动根据数据进行映射
+  静态:自定义字段的数据类型
+  
+  访问192.168.1.101:5601 kibana 
+  setting -> indices  -> 创建时间戳  @timestamp
+  logstash-* fields 显示索引
+  Discover -> 选定时间
+  
+安装logstash
+  需要java
+  [root@logstash ~]#  java -version
+  openjdk version "1.8.0_131"
+  OpenJDK Runtime Environment (build 1.8.0_131-b12)
+  OpenJDK 64-Bit Server VM (build 25.131-b12, mixed mode)
+  [root@logstash ~]# touch /etc/logstash/logstash.conf
+  [root@logstash ~]#  /opt/logstash/bin/logstash  --version
+  logstash 2.3.4
+  [root@logstash ~]# /opt/logstash/bin/logstash-plugin  list   //查看插件
+  ...
+  logstash-input-stdin    //标准输入插件
+  logstash-output-stdout    //标准输出插件
+  ...
+  [root@logstash ~]# vim /etc/logstash/logstash.conf
+  input{
+      stdin{
+     }
+  }
+  filter{
+  }
+  output{
+      stdout{
+     }
+  }
+  [root@logstash ~]# /opt/logstash/bin/logstash -f /etc/logstash/logstash.conf 
+  //启动并测试
+  Settings: Default pipeline workers: 2
+  Pipeline main started
+  aa        //logstash 配置从标准输入读取输入源,然后从标准输出输出到屏幕
+  2018-09-15T06:19:28.724Z logstash aa
+
+https://www.elastic.co/guide/en/logstash/current/index.html    //官方操作手册
+
+  [root@logstash ~]# cd /opt/logstash/bin/
+  [root@logstash bin]# ls
+                  ./logstash list
+  
+使用codec类插件编解码
+  input{
+    stdin{codec => "json" }
+  }
+  filter{}
+  output{
+    stdout{codec => "rubydebug"}
+  }
+  
+ 验证
+ [root@logstash bin]# /opt/logstash/bin/logstash -f /etc/logstash/logstash.conf
+ 
+file模块
+  input file
+  根据帮助文档
+  input{
+  file {
+    path          => [ "/tmp/a.log", "/var/tmp/b.log" ]
+   sincedb_path   => "/var/lib/logstash/sincedb"    //记录读取文件的位置
+   start_position => "beginning"                //配置第一次读取文件从什么地方开始
+   type           => "testlog"                    //类型名称
+  }
+  tcp {
+    mode => "server"
+    host => "0.0.0.0"
+    port => 8888
+    type => "tcplog"
+  }    
+   udp {
+    port => 8888
+    type => "udplog"
+  }
+  }
+  filter{
+  }
+  output{
+      stdout{
+      codec => "rubydebug"
+  }
+  }
+
+tcp和udp
+ input {
+    tcp {
+    mode => "server"                  //server 或 client 自己角色决定监听信息
+    host => "0.0.0.0"
+    port => 8888
+    type => "tcplog"
+  }    
+   udp {
+    port => 8888
+    type => "udplog"
+  }
+  }
+    [root@esnode1 ~]# echo tcp > /dev/tcp/192.168.1.105/8888  // man bash  /tcp
+    
+syslog插件
+  input{
+      syslog {
+     port => "514"                //可以不写
+     type => "syslog"
+  }
+  }
+   [root@logstash bin]# /opt/logstash/bin/logstash -f /etc/logstash/logstash.conf
+   [root@logstash ~]# ss -natulp | grep 514
+    
+    [root@esnode1 ~]# vim /etc/rsyslog.conf
+    local0.notice                             @@192.168.1.105:514
+    [root@esnode1 ~]# systemctl restart rsyslog.service
+    [root@esnode1 ~]# logger -p local0.notice -t TEST xxxxxxx
+    
+
+ filter grok插件
+  grok插件：
+    解析各种非结构化的日志数据插件
+    grok使用正则表达式把飞结构化的数据结构化
+    在分组匹配，正则表达式需要根据具体数据结构编写
+    虽然编写困难，但适用性极广
+
+  filter{
+   grok{
+        match => ["message", "(?<key>reg)"]
+  }
+}
