@@ -1,0 +1,228 @@
+ELK
+  三个软件首字母缩写,是一套分布式日志分析软件
+  -Elasticsearch:负责日志检索和存储
+  -logstash:负责日志的收集和分析,处理
+  -kibana:负责日志可视化
+  
+ELK能作什么
+  -分布式日志数据集中式查询和管理
+  -系统监控,包含系统硬件和应用各个组件的监控
+  -故障排查
+  -安全信息和事件管理
+  -报表功能
+  
+Elasticsearch                                         //nosql数据库
+  -基于Lucene的搜索服务器,提供了分布式多用户能力的搜索引擎
+  -Elasticserch是用java开发（需要安装openjdk）,流行的企业级搜索引擎,设计应用于云计算
+ 
+ 主要特点
+  -实时分析
+  -分布式文件存储
+  -文档导向,所有文件都是文档
+  -高可用,支持集群(cluster),分片和复制(shards,replicas)
+  -接口支持json
+  
+ES
+  -没有典型意义的事物
+  -面向文档的数据库
+  -没有提供授权和认证的特性
+  
+ES相关概念
+  -node:节点
+  -cluster:集群
+  -document:文档 一个可被搜索的基础信息单元
+  -Index:索引 拥有相似特征的文档集合 类似于mysql里的库
+  -type:类型 一个索引可以定义一种或多种类型
+  -filed:列 ES里的最小单位
+  -shards:索引的分片 
+  -replicas: 分片的拷贝
+  
+  DB->Database->tables->rows->columns
+  ES->Index->types->document->filed
+  
+  相关操作都是用http协议中的 put post get delete 增删改查
+  
+ES安装
+  yum -y install java-1.8.0-openjdk
+  yum -y install elasticsearch
+
+修改配置文件
+  17  cluster.name: nsd1810
+  23  node.name: esnode1(本机主机名)
+  54  network.host: 0.0.0.0
+  68  discovery.zen.ping.unicast.hosts: ["esnode1", "esnode2", "esnode3", "esnode4", "esnode5"] //不用都写写几个即可
+  
+  [root@se1 ~]# systemctl restart elasticsearch
+  [root@se1 ~]# systemctl enable elasticsearch
+  [root@se1 ~]# ss -antup | grep 9200
+  tcp    LISTEN     0      50       :::9200                 :::*                   users:(("java",pid=23231,fd=110))
+  访问9200
+  http://192.168.1.100:9200/_cluster/health?pretty
+  {
+  "cluster_name" : "nsd1810",
+  "status" : "green",
+  "timed_out" : false,
+  "number_of_nodes" : 5,
+  "number_of_data_nodes" : 5,
+  "active_primary_shards" : 0,
+  "active_shards" : 0,
+  "relocating_shards" : 0,
+  "initializing_shards" : 0,
+  "unassigned_shards" : 0,
+  "delayed_unassigned_shards" : 0,
+  "number_of_pending_tasks" : 0,
+  "number_of_in_flight_fetch" : 0,
+  "task_max_waiting_in_queue_millis" : 0,
+  "active_shards_percent_as_number" : 100.0
+  }
+
+http协议简介
+  -请求行,消息报头,正文
+  -方法符号开头空格分开 URI 协议版本号 分隔符
+   method Request-URI HTTP-Version CRLF
+   GET  /index.html  HTTP v1.1 
+   
+http的请求方法：
+    常用方法 GET，POST，HEAD
+    其他方法 OPTIONS，PUT，DELETE，TRACE和CONNECT
+    ES常用：
+    PUT --增
+    DELETE --删
+    POST --改
+    GET --查
+    系统命令curl：
+    是一个利用URL规则在命令行下工作的文件传输工具,可以说是一款很强大的http命令行工具。它支持多种请求模式,自定义请求头等强大功能,是一款综合工具
+    curl 常用参数介绍：
+    -A 修改请求 agent
+    -X 设置请求方法
+    -i 显示返回头信息
+    
+ ES插件
+    步骤一：部署插件
+      插件装在哪一台机器上，只能在哪台机器上使用（这里安装在se5机器上面）
+      1）使用远程 uri 路径可以直接安装
+      [root@se5 ~]# cd /usr/share/elasticsearch/bin
+      [root@se5 bin]# ./plugin  install  \ 
+        ftp://192.168.1.254/elk/elasticsearch-head-master.zip        //安装head插件
+      [root@se5 bin]# ./plugin  install  \ 
+        ftp://192.168.1.254/elk/elasticsearch-kopf-master.zip        //安装kopf插件
+      [root@se5 bin]# [root@se5 bin]# ./plugin install  \
+        ftp://192.168.1.254/elk/bigdesk-master.zip
+        //安装bigdesk插件     
+      [root@se5 bin]# ./plugin  list        //查看安装的插件
+        Installed plugins in /usr/share/elasticsearch/plugins:
+        - head
+        - kopf
+        - bigdesk
+        
+      2) 访问head插件，如图-4所示：
+       [root@room9pc01 ~]#  firefox http://192.168.1.65:9200/_plugin/head
+       
+     head插件
+     -它展现ES集群的拓扑结构,并且可以通过index索引和节点node级别操作
+     -它提供一组针对集群的查询API,结果以json格式返回
+     -它提供一些快捷菜单,用以展现集群的各种状态
+     
+     kopf插件
+     -时一个es的管理工具
+     -提供了对ES集群操作的API
+     
+     bigdesk插件
+     -是一个es集群的监控工具
+     -可以通过它来查看es集群的各种状态
+     
+扩展插件RESTful API
+   ES提供了一系列的RESTful的API
+   -检查集群,节点,索引 状态及统计
+   -管理集群,节点,索引 的数据及元数据
+   -对索引进行CRUD操作及查询
+   -执行其他高级操作如分页,排序,过滤
+   
+   POST或PUT数据使用json格式
+   
+   RESTful API的简单使用
+     -_cat API查询集群状态,节点信息
+     -v参数显示详细信息
+       http://192.168.4.15:9200/_cat/health?v
+       
+     -help显示帮助信息
+       http://192.168.4.15:9200/_cat/health?help
+       
+     -nodes铲鲟节点状态
+       http://192.168.4.15:9200/_cat/nodes?v
+       
+     -索引信息
+         http://192.168.4.15:9200/_cat/indices?v
+         
+ 步骤二：使用head创建index
+      [root@se5 bin]# curl -X PUT "http://192.168.1.65:9200/index" -d '
+      > {
+      >     "settings":{
+      >     "index":{
+      >     "number_of_shards":5,        //分片数
+      >     "number_of_replicas":1        //副本数
+      >    }
+      >   }
+      > }'
+      {"acknowledged":true}
+      
+插入，增加，删除查询数据 
+ 步骤一：增加数据  
+    [root@se5 ~]# locale
+    [root@se5 ~]# LANG=en_US.UTF-8  //设置编码
+    [root@se5 ~]# curl -X PUT "http://192.168.1.65:9200/taindex/teacher/1" -d '{
+    "职业":"诗人",
+    "名字":"李白",
+    "称号":"诗仙",
+    "年代":"唐"
+    }'
+    {"_index":"taindex","_type":"teacher","_id":"1","_version":2,"_shards":{"total":2,"successful":2,"failed":0},"created":false}
+   
+ 步骤二：修改数据
+    [root@se5 ~]# curl -X POST "http://192.168.1.65:9200/taindex/teacher/1/_update" -d '{
+     "doc":{
+     "年代": "唐代"
+     }
+     }'
+    {"_index":"taindex","_type":"teacher","_id":"1","_version":3,"_shards":{"total":2,"successful":2,"failed":0},"created":false}
+    
+ 步骤三：查询数据
+    [root@se5 ~]#  curl -X GET "http://192.168.1.65:9200/taindex/teacher/3?pretty"
+    
+ 步骤四:删除数据
+    [root@se5 ~]# curl -X DELETE "http://192.168.1.65:9200/taindex/teacher/3?pretty"
+    
+    [root@se5 bin]# curl -X DELETE http://192.168.1.65:9200/taindex/   
+    //删除索引
+    {"acknowledged":true}
+    [root@se5 bin]# curl -X DELETE http://192.168.1.65:9200/*      //删除所有索引
+    {"acknowledged":true}
+
+Kibana安装与配置
+  Kibana数据可视化平台
+  
+  安装yum rpm安装
+  默认安装在/opt/路径下
+  配置文件/opt/kibanna/config/kibana.yml
+  
+  [root@kibana ~]# vim /opt/kibana/config/kibana.yml
+      2 server.port: 5601        
+    //若把端口改为80，可以成功启动kibana，但ss时没有端口，没有监听80端口，服务里面写死了，不能用80端口，只能是5601这个端口
+      5 server.host: "0.0.0.0"        //服务器监听地址
+    15 elasticsearch.url: http://192.168.1.61:9200    
+    //声明地址，从哪里查，集群里面随便选一个
+    23 kibana.index: ".kibana"    //kibana自己创建的索引
+    26 kibana.defaultAppId: "discover"    //打开kibana页面时，默认打开的页面discover
+    53 elasticsearch.pingTimeout: 1500    //ping检测超时时间
+    57 elasticsearch.requestTimeout: 30000    //请求超时
+    64 elasticsearch.startupTimeout: 5000    //启动超时
+    [root@kibana ~]# systemctl restart kibana
+    [root@kibana ~]# systemctl enable  kibana
+    Created symlink from /etc/systemd/system/multi-user.target.wants/kibana.service to /usr/lib/systemd/system/kibana.service.
+    [root@kibana ~]# ss -antup | grep 5601  //查看监听端口
+
+    [root@kibana ~]# firefox 192.168.1.66:5601
+    
+    点击Status，查看是否安装成功，全部是绿色的对钩,说明安装成功
+    用head插件访问会有.kibana的索引信息
+[root@se5 ~]# firefox http://192.168.1.65:9200/_plugin/head/
