@@ -1,0 +1,235 @@
+ansible
+  -自动化部署app
+  -自动化管理配置项
+  -自动化持续交付
+  -自动化(AWS)云服管理
+  
+优势:
+  -只需要ssh和python
+  -无客户端
+  -功能强大,模块丰富
+  -简单易上手
+  -基于python
+      -paramiko
+      -PyYAML
+      -jinja2
+  
+安装ansible  
+  a)ansible源码下载
+    -git clone git://github.com/ansiable/ansiable.git
+    -yum install python-setuptools python-devel
+    -python setup.py build
+    -python setup.py install
+    
+ b)yum安装
+    
+ansible配置文件查找顺序
+  先监测ANSIBLE_CONFIG变量定义的配置文件
+  监测当前目录./ansiable.cfg 文件
+  当前用户家目录./ansiable.cfg
+  最后/etc/ansible/ansible.cfg
+  
+编辑/etc/ansible/ansible.cfg  
+  14 inventory      = /etc/ansible/hosts
+  61 host_key_checking = False
+  
+编辑/etc/ansible/hosts
+ 44 [web]
+ 45 web[1:2]
+ 46 
+ 47 [db]
+ 48 db1
+ 49 db2
+ 50 
+ 51 [cache]
+ 52 cache
+
+验证
+[root@ansible ~]# ansible web --list-hosts
+ [WARNING]: Found both group and host with same name: cache
+
+ hosts (2):
+ web1
+ web2
+ 
+ [root@ansible ~]# ansible db,cache --list-hosts
+ [WARNING]: Found both group and host with same name: cache
+
+  hosts (3):
+  db1
+  db2
+  cache
+
+ [root@ansible ~]# ansible all --list-hosts
+  hosts (5):
+    web1
+    web2
+    cache
+    db1
+    db2
+
+配置/etc/hosts
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+192.168.1.10    ansible
+192.168.1.11    web1
+192.168.1.12    web2
+192.168.1.21    db1
+192.168.1.22    db2
+192.168.1.33    cache
+
+配置集合和端口的例子
+  ## db-[99:101]-node.example.com
+[web]
+web[1:2]
+
+[db]
+db1
+db2
+
+#[db:vars]                 ////web组:变量(vars不改)改变ssh端口号
+#ansible_ssh_port=222
+
+[other]
+cache
+
+[app:children]    //指定子分组(app可改:children不改)，web，db是提前分好的组
+web
+db
+
+[web:vars]    //web组:变量(vars不改)，web组的多台机器共用一个用户名和密码
+ansible_ssh_user="root"
+ansible_ssh_pass="a"
+[root@ansible ansible]# ansible web -m ping   // -k 带密码
+web2 | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+web1 | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+
+自定义的ansible文件只在当前路径生效
+    [root@ansible ~]# mkdir aaa
+    [root@ansible ~]# cd aaa/
+    [root@ansible aaa]# vim myhost
+    [app1]
+    web1
+    db1
+    [app2]
+    web2
+    db2
+    [app:children]
+    app1
+    app2
+    [other]
+    cache
+    [app:vars]
+    ansible_ssh_user="root"
+    ansible_ssh_pass="a"
+    [root@ansible aaa]# touch ansible.cfg
+    [root@ansible aaa]# grep -Ev "^#|^$" /etc/ansible/ansible.cfg 
+    [defaults]
+    roles_path    = /etc/ansible/roles:/usr/share/ansible/roles
+    host_key_checking = False
+    [inventory]
+    [privilege_escalation]
+    [paramiko_connection]
+    [ssh_connection]
+    [persistent_connection]
+    [accelerate]
+    [selinux]
+    [colors]
+    [diff]
+    [root@ansible aaa]# vim ansible.cfg 
+    [defaults]
+    inventory = myhost
+    host_key_checking = False
+    
+动态主机
+    inventory指定的不是一个文件,是一个脚本,要求返回json根是返回给ansilbe命令
+    -Json (javaScript Object Notation)   //一种数据交换格式
+    
+ansible命令格式
+  ansible 主机,集合名称 -m 模块名称 -a 模块参数
+  ansible all -m command -a 'id' -k
+  
+  [root@ansible ~]# ansible all -m command -a 'date' -k    //-k 交互式输入密码
+  SSH password: 
+  cache | SUCCESS | rc=0 >>
+  2019年 02月 21日 星期四 01:27:13 EST
+
+  web2 | SUCCESS | rc=0 >>
+  2019年 02月 21日 星期四 01:27:13 EST
+
+  db2 | SUCCESS | rc=0 >>
+  2019年 02月 21日 星期四 01:27:13 EST
+
+  web1 | SUCCESS | rc=0 >>
+  2019年 02月 21日 星期四 01:27:13 EST
+
+  db1 | SUCCESS | rc=0 >>
+  2019年 02月 21日 星期四 01:27:13 EST
+
+批量部署密钥文件 
+  cd /root/.ssh
+  ssh-keygen -t rsa -N "" -b 1024
+  
+  [root@ansible ~]#  ansible all -m authorized_key -a "user=root exclusive=true manage_dir=true key='$(< /root/.ssh/id_rsa.pub)'" -k
+    SSH password: 
+    web1 | SUCCESS => {
+    ...
+  [root@ansible .ssh]# ansible all -m ping  //成功
+    
+模块练习
+  ansible-doc   相当于man帮助
+  ping 模块
+  command 模块
+    command默认模块 但是不支持管道
+  shell|raw 模块
+    和command用法一样,但是shell会启用bin/sh 所以支持所有任意命令
+    raw 兼容性更好,但是布支持chdir creates removes
+    [root@ansible ~]# ansible web2 -m shell -a "echo 456 | passwd --stdin dd"
+    
+  script 模块
+    远程批量执行脚本
+    [root@ansible ~]# ansible web -m script -a /root/uu.sh
+    
+  copy 模块
+    src 源目标 dest 目的路径
+    backup 默认是no 直接覆盖 yes是制作备份文件 no是常用选项
+    force 强制覆盖
+    [root@ansible ~]# ansible web -m copy -a 'src=/etc/resolv.conf dest=/etc/resolv.conf'
+  
+  lineinfile | replace 模块    类似于 sed
+    -path
+    -regexp
+    -line
+    [root@ansible ~]# ansible db -m lineinfile -a 'path=/etc/resolv.conf regexp="^search" line="search tedu.cn"'
+    
+    [root@ansible ~]# ansible db -m replace -a 'path=/etc/resolv.conf regexp="^(search).*" replace="\1 aaa.com"'
+    
+  yum 模块
+    参数 name 包名   
+        state 状态
+            installed安装  removed删除  
+        
+        [root@ansible ~]# ansible cache -m yum -a 'name=vsftpd state=installed'
+        cache | SUCCESS => {
+        ...
+        
+   service 模块
+      参数 name 名字
+      state  状态   started stoped
+      enabled  yes|no
+      sleep 执行restarted 中间间隔秒数
+        [root@ansible ~]# ansible cache -m service -a 'name=vsftpd state=started enabled=yes'
+        cache | SUCCESS => {
+   
+   setup 模块
+    [root@ansible ~]# ansible db1 -m setup 
+    [root@ansible ~]# ansible db1 -m setup | grep os
+    [root@ansible ~]# ansible db1 -m setup -a 'filter="ansible_os_family"'
+      db1 | SUCCESS => {
+... //建议使用filter 返回的是json格式 传参数比较有利
