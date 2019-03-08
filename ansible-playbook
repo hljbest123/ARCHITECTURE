@@ -1,0 +1,542 @@
+playbook基础
+  ansible七武器
+    -ansible命令 
+    -ansible-doc 可以针对不同模块 类似于linux man帮助
+    -ansible-console 交互式的命令方式
+    -ansible-galaxy 从github上下载管理Roles的一款工具,于python的pip类似
+    -ansible-playbook 读取预先编写号的playbook文件实现批量管理,按一定条件组成的ansible任务集
+    -ansible-vault 用于配置文件加密,
+    -ansible-pull  工作模式pull/push 默认是push模式 pull和push机制刚好相反 用于大批量机器配置
+    
+  json简介
+    playbook的输出格式
+    json是javascript对象表示法,基于文本独立语言的轻量级数据交换格式
+    json分隔符 单引号 " ' " 括号 () [] {}  冒号 " : "  逗号 " , "
+    
+    json数据格式
+      纯文本    只有字符串
+      层级结构   值中存在值
+      可以通过javaScript进行解析
+      
+    json 语法规则
+      数据在名称/值对中
+      数据由逗号分割
+      大括号保存对象
+      中括号保存数组
+      
+    json 书写格式
+     名称/值对
+      例如: "诗仙" : "李白"
+      
+    json 数组
+     例如: 
+      { "诗人":
+        ["李白","杜甫","白居易","李贺"]              //数组可以是一组 值,键值对,对象的集合
+      }                                            //对象是多组 名称:值 (键值对) 来描述一个事物
+      复合复杂类型
+      { "诗人":
+        [{"李白":"诗仙","年代":"唐"},
+         {"杜甫":"诗圣","年代":"唐"},
+         {"白居易":"诗魔","年代":"唐"},
+         {"李贺":"诗鬼","年代":"唐"}
+        ]
+      }
+           数组 对象 键值 反复欠套
+        
+  yaml简介
+    -yaml概念
+      -是一个可读性高,用来表达数据序列的格式
+      -YAML (TAML Ain't Markup Language)
+      -参考多种语言：C Python perl 从xml中获得灵感
+      
+    -yaml的基础语法
+      -yaml的结构通过空格来展示
+      -数组使用"- "表示
+      -键值对使用": "表示
+      -使用固定的缩进风格表示数据层级结构关系
+      -一个缩进使用两个以上空格 "  " 不要使用tab 同一层级缩进必须对齐
+      -#表示注释
+      
+    -yaml键值表示方法 
+      -采用冒号分隔
+      -:后面必须有一个空格
+      例子:
+        "李白": "诗仙"    //:后面加空格
+        或者
+        "李白":
+          "诗仙"          //回车 "  "俩个空格缩进
+       
+      -复杂YAML的键值对嵌套
+        "诗人":
+          "李白": "诗仙"      
+        或
+        "诗人":
+          "李白":
+            "诗仙"
+        
+      -YAML数组的例子
+        - "李白"
+        - "杜甫"
+        - "白居易"
+        - "李贺"
+        
+      -hash数组
+      "诗人":
+        - "李白"
+        - "..."
+        ...
+      
+      高级复合表达式
+      "诗人":
+        - 
+          "李白": "诗仙"
+          "年代": "唐"
+        - 
+          "杜甫": "诗圣"
+          "年代": "唐"
+        
+  jinja2模版简介
+    -jinja2
+      基于python的模版引擎,包含变量和表达式俩部分,两者在模版求值时会被替换为值,模版中还有标签,控制逻辑
+      playbook的模版使用python的jinja2模块
+    
+    -jinja2模版
+      -模版表达式都是包含分隔符"{{  }}"内    // shell  ${A} ={{A}}
+      -控制语句都是包含在分隔符"{% %}"内的
+      -模版支持注释 都时包含在"{# #}"内的
+      -调用变量
+        {{varname}}
+      -计算
+        {{2+3}}
+      -判断
+        {{1 in [1,2,3]}}
+        
+      jinja2模版控制语句 判断
+        {% if name == '诗仙' %}
+           李白
+        {% elif name == '诗圣' %} 
+          杜甫
+        {% else %}
+          白居易
+        {% endif %}
+        
+      jinja2模版控制语句  循环
+        {% if name == ... %}
+          ... ...
+        {% elif name == '于谦' %}
+          {% for methond in [抽烟,喝酒,烫头] %}
+            {{do methond}}
+          {% endfor %}
+          ......
+          {% endif %}
+      
+      jinja2的过滤器
+        类似于shell里的管道
+        echo "abc" | md5sum
+        {{"abc" | hash('md5')}}
+        
+        把一个列表用逗号连接起来 : {{list | join (',')}}
+        在线查询文档 http://docs.jinkan.org/docs/jinjia2/templates.html
+        #builtin-filters
+        
+ playbook
+    -playbook即ansible的脚本
+    -具体解决ad-hoc是单条的 保存不了
+    -ansible自动化运维很大程度都是由编写playbook来完成
+    
+ playbook语法基础
+  playbook由yaml语言编写,遵循yaml标准
+   -#之后代表注释
+   -同一个列表的元素保持相同的缩进
+   -playbook由一个或多个play组成
+   -play中hosts,variables,roles,tasks等对象的表示方法都是键值中间已": "分隔
+   -yaml文件开始都是以---,表示一个文件的开始
+   
+ playbook构成
+    -Target: 定义要执行playbook的远程主机组
+    -Variable:使用变量
+    -Tasks:定义将要在远程主机上执行的任务列表  任务
+    -Handler:定义task执行完成以后需要调用的任务  管理者
+    
+ playbook执行结果
+  使用ansible-playbook运行playbook文件,输出内容为Json格式 
+   -绿色代表执行成功
+   -红色代表执行失败
+   -***代表系统状态发生改变
+   
+ 第一个playbook
+ ---                 #表示开始
+ -hosts: all
+ remote_user: root
+ tasks:
+   - ping:
+ 
+ ansible-playbook myping.yml -f 5
+ 
+ -f并发进程数量,默认5
+ -hosts行 一个多个组或者主机的patterns
+ -remote_user 账户名
+ 
+ tasks
+  -每一个play包含了一个task列表（任务列表）
+  -一个task在其所对应的所有主机上（通过host pattern匹配所有主机）执行完毕后才会执行下一个task
+  -在一个play之中,所有hosts会获取相同的任务指令,
+  
+    ---
+    - hosts:all
+      remote_user: root
+      tasks:
+        -name:create user plj                   //tasks下的name全是说明注释 
+         user: 
+           name:plj                             //非tasks下的name查看相关命令的帮助
+           #group=wheel uid=1000 name=plj
+        -shell: echo 123 | passwd --stdin plj
+        -shell: chage -d 0 plj
+        
+   方法:
+   1)[root@ansible ~]# ansible-doc -l | grep user
+      ...
+      user                                      Manage user accounts
+      ...
+   2)[root@ansible ~]# ansible-doc user
+      查看EXAMPLES
+      EXAMPLES:
+        # Add the user 'johnd' with a specific uid and a primary group of 'admin'
+        - user:
+          name: johnd
+          comment: "John Doe"
+          uid: 1040
+          group: admin
+
+   3)复制修改执行
+   [root@ansible ~]# ansible-playbook user.yml 
+
+    PLAY [all] *********************************************************************
+
+    TASK [Gathering Facts] *********************************************************
+      ok: [web1]
+      ok: [web2]
+      ok: [db2]
+      ok: [cache]
+      ok: [db1]
+
+httpd的例子
+---
+- hosts: web
+  remote_user: root
+  tasks:
+  - name: install the latest version of Apache
+    yum:
+      name: httpd
+      state: latest
+  - lineinfile:
+      path: /etc/httpd/conf/httpd.conf
+      regexp: '^Listen '
+      insertafter: '^#Listen '
+      line: 'Listen 8080'
+  - lineinfile:
+      path: /etc/httpd/conf/httpd.conf
+      regexp: '^#ServerName '
+      line: 'ServerName localhost'
+  - copy:
+      src: index.html
+      dest: /var/www/html/index.html
+      owner: apache
+      group: apache
+      mode: 0644
+  - service:
+      name: httpd
+      state: started
+
+[root@ansible ~]# ansible-playbook httpd.yml 
+
+PLAY [web] *********************************************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [web2]
+ok: [web1]
+
+TASK [install the latest version of Apache] ************************************
+ok: [web2]
+ok: [web1]
+
+语法进阶
+  变量
+    [root@ansible ansible]# vim user.yml
+---
+- hosts: cache
+  remote_user: root
+  vars:
+    username: xiaoming
+  tasks:
+    - name: create user "{{username}}"
+      user: group=wheel uid=1000 name={{username}}
+      #password: "{{'aa' | password_hash('sha512')}}"   在/etc/login.defs 查看加密算法
+    - shell: echo 123456 | passwd --stdin xiaoming
+    - shell: chage -d 0 {{username}}
+[root@ansible ansible]# ansible-playbook user.yml   //执行结果
+   
+   error
+   ansible-playbook 对错误处理
+   默认情况判断$?,如果值不为0就停止执行
+   ansible如果接受$? ！= 0 就会报错
+   
+   错误的处理方法
+   playbook从上往下顺序执行，若报错，后面的命令不会在执行，若想解决有两种方法：
+    1)当返回值为假时，显示true： - shell: setenforce 0 || true   
+        [root@ansible ansible]# vim user5.yml
+---
+- hosts: cache
+  remote_user: root
+  vars:
+    user: bb
+  tasks:
+   - shell: setenforce 0 || true              // true命令可以使$?=0 用true命令来欺骗ansible
+   - user:
+       name: "{{user}}"
+       group: root
+       password: "{{'123456' | password_hash('sha512')}}"
+   - shell: chage -d 0 "{{user}}"
+   
+    2)忽略：ignoring_errors: True(推荐使用这个，会有报错信息，告诉你错误忽略，继续执行下面的命令)
+    [root@ansible ansible]# vim user6.yml
+---
+- hosts: cache
+  remote_user: root
+  vars:
+    user: bb
+  tasks:
+   - shell: setenforce 0 
+     ignore_errors: True              
+   - user:
+       name: "{{user}}"
+       group: root
+       password: "{{'123456' | password_hash('sha512')}}"
+   - shell: chage -d 0 "{{user}}"
+[root@ansible ansible]# ansible-playbook user6.yml 
+    
+ handlers
+ 关注的资源发生变化时采取的操作
+  notify(通知)这个动作,会在每个play最后触发
+  避免多次改变每次都执行操作
+  在notify中列出的操作称为handlers(操作者) 即notify调用handlers里的操作
+  
+  1)使用handlers来配置文件,重新载入配置文件让服务生效
+    [root@ansible ansible]# vim adhttp.yml
+---
+- hosts: cache
+  remote_user: root
+  tasks:
+    - copy:
+        src: /root/httpd.conf
+        dest:  /etc/httpd/conf/httpd.conf
+        owner: root
+        group: root
+        mode: 0644
+      notify:
+        - restart httpd
+  handlers:
+     - name: restart httpd
+       service: name=httpd state=restarted
+[root@ansible ansible]# ansible-playbook adhttp.yml 
+
+   2)使用变量的方法
+   [root@ansible ansible]# vim adhttp2.yml
+---
+- hosts: cache
+  remote_user: root
+  vars:
+    server: httpd
+  tasks:
+    - copy:
+        src: /root/httpd.conf
+        dest:  /etc/httpd/conf/httpd.conf
+        owner: root
+        group: root
+        mode: 0644
+      notify:
+        - restart "{{server}}"
+  handlers:
+     - name: restart "{{server}}"
+       service: name=httpd state=restarted
+[root@ansible ansible]# ansible-playbook adhttp2.yml
+
+tags 标签
+  tags给指定的任务定义一个调用标识
+  ---
+- hosts: web
+  remote_user: root
+  tasks:
+  - name: install the latest version of Apache
+    yum:
+      name: httpd
+      state: latest
+  - lineinfile:
+      path: /etc/httpd/conf/httpd.conf
+      regexp: '^Listen '
+      insertafter: '^#Listen '
+      line: 'Listen 8080'
+  - lineinfile:
+      path: /etc/httpd/conf/httpd.conf
+      regexp: '^#ServerName '
+      line: 'ServerName localhost'
+    tags:confhttp  
+  - copy:
+      src: index.html
+      dest: /var/www/html/index.html
+      owner: apache
+      group: apache
+      mode: 0644
+    tags:confindex  
+  - service:
+      name: httpd
+      state: started
+可以单独调用标签来执行标签内容
+
+   [root@ansible ~]# ansible-playbook --list-tags httpd.yml 
+
+playbook: httpd.yml
+
+  play #1 (web): web	TAGS: []
+      TASK TAGS: [confhttp,confindex]
+
+   [root@ansible ~]# ansible-playbook httpd.yml tags=confindex
+
+when
+  当满足特定条件后再触发某一操作,或在特定条件下终止某个行为
+  远程中的系统变量facts作为when的条件,通过setup模块查看
+  
+  例子:
+  当系统负载超过0.7时，则关掉httpd
+  [root@ansible ansible]# vim when.yml
+---
+- hosts: cache
+  remote_user: root
+  tasks:
+    - shell: uptime | awk '{printf("%.2f",$(NF-2))}'
+      register: result
+    - service:
+        name: httpd
+        state: stopped
+      when: result.stdout|float > 0.7
+  [root@ansible ansible]# ansible-playbook when.yml 
+  
+  例子2判断操作系统
+---
+ -name: Install VIM
+  hosts: all
+  tasks: 
+    - name: Install VIM via yum
+      yum: name=vim-enhanced state=installed
+      when:ansible_os_family == "RedHat"
+    - name Install VIM via apt  
+      apt: name=vim state=installed
+      when:ansible_os_family == "Debian"
+      
+  register
+    判断一个命令的执行结果去处理后面的操作,这时候需要register保存一个命令的返回状态
+    在后面进行调用
+    
+    如果用户存在就布执行 如果用为假 执行创建用户
+    task:
+      - shell: id {{username}}
+        register: result      //result代表定义的变量
+      - name: change "{{username}}" passwd
+        user: 
+          password={{'123' | password_hash=('sha512')}} 
+          name={{username}}  
+        when:result
+        
+   当系统负载超过0.7时，则关掉httpd 
+      [root@ansible ansible]# vim when.yml
+---
+- hosts: cache
+  remote_user: root
+  tasks:
+    - shell: uptime | awk '{printf("%.2f",$(NF-2))}'  //printf "%.2f" 保留小数点后2位的小数
+      register: result
+    - service:
+        name: httpd
+        state: stopped
+      when: result.stdout|float > 0.7     //stdout 标准输出  管道给float型
+[root@ansible ansible]# ansible-playbook when.yml   
+
+with_items
+  是playbook的标准循环
+  [root@ansible ansible]# vim add.yml
+---
+- hosts: web2
+  remote_user: root
+  tasks:
+    - user:
+        name: "{{item.name}}"
+        group: "{{item.group}}"
+        password: "{{'123456'|password_hash('sha512')}}"
+      with_items:
+        - {name: "aa", group: "users"}
+        - {name: "bb", group: "mail" }
+        - {name: "cc", group: "wheel"}
+        - {name: "dd", group: "root" }
+[root@ansible ansible]# ansible-playbook add.yml 
+
+嵌套循环，循环添加多用户
+[root@ansible ansible]# vim add1.yml 
+---
+- hosts: web2
+  remote_user: root
+  vars:
+    un: [a, b, c]
+    id: [1, 2, 3]
+  tasks:
+    - name: add users
+      shell: echo {{item}}
+      with_nested:
+        - "{{un}}"
+        - "{{id}}"
+ [root@ansible ansible]# ansible-playbook add1.yml 
+
+include and roles
+在编写playbook的时候随着项目越来越大，playbook越来越复杂。可以把一些play、task 或 handler放到其他文件中，通过包含进来是一个不错的选择
+roles像是加强版的include，它可以引入一个项目的文件和目录
+一般所需的目录层级有
+vars：变量层
+tasks：任务层
+handlers：触发条件
+files：文件
+template：模板
+default：默认，优先级最低
+
+...
+tasks:
+   - include: tasks/setup.yml
+   - include: tasks/users.yml user=plj 
+//users.yml 中可以通过{{ user }}来使用这些变量
+handlers:
+  - include: handlers/handlers.yml
+  
+debug检测
+[root@ansible ansible]# ansible-playbook  --syntax-check  http.yml  //检测语法
+playbook: http.yml
+[root@ansible ansible]# ansible-playbook  -C  http.yml   //测试运行
+[root@ansible ansible]# ansible-playbook   http.yml  --list-tasks    // --list-hosts
+//显示要执行的工作
+playbook: http.yml
+  play #1 (cache): cache    TAGS: []
+    tasks:
+      install one specific version of Apache    TAGS: []
+      lineinfile    TAGS: []
+      replace    TAGS: []
+      service    TAGS: []
+      copy    TAGS: []
+[root@ansible ansible]# vim debug.yml
+---
+- hosts: cache
+  remote_user: root
+  tasks:
+    - shell: uptime |awk '{printf("%f\n",$(NF-2))}'
+      register: result
+    - shell: touch /tmp/isreboot
+      when: result.stdout|float > 0.5
+    - name: Show debug info
+      debug: var=result
+[root@ansible ansible]# ansible-playbook debug.yml //运行
